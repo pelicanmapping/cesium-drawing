@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Use correct character set. -->
+  <meta charset="utf-8">
+  <!-- Tell IE to use the latest, best version. -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+  <title>Cesium Drawing</title>
+  <script src="Cesium/Cesium/Cesium.js"></script>
+  <style>
+    @import url(Cesium/Cesium/Widgets/widgets.css);
+      html, body, #cesiumContainer {
+        position: absolute;
+        width: 100%;
+        bottom: 0px;
+        top: 0px;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+
+  </style>
+</head>
+<body>
+
+    <div id="cesiumContainer"></div>
+    <script>
+
+
+    var viewer = new Cesium.Viewer('cesiumContainer');
+
+
+    // The list of positions to modify.
+    var positions = [];
+
+    var entity = viewer.entities.add({
+        name : 'Entity',
+        polyline : {
+            // We need to use a callback property to ensure that this geometry is not built in a web worker
+            // so we can update it on the fly.
+            positions : new Cesium.CallbackProperty(function(time, result) {
+              return positions;
+            }),
+            width : 2,
+            material : Cesium.Color.RED
+        },
+        polygon : {
+            hierarchy : new Cesium.CallbackProperty(function(time, result) {
+              return positions;
+            }),
+            extrudedHeight: 50000,
+            perPositionHeight : true,
+            material : Cesium.Color.ORANGE.withAlpha(0.5),
+            outline : true,
+            outlineColor : Cesium.Color.BLACK
+        }
+    });
+
+    // Adds a point to the positions list.
+    var addPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    addPointHandler.setInputAction(function(movement) {
+        var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
+        if (cartesian) {
+          positions.push( cartesian );
+        }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    // Replaces the last point in the list with the point under the mouse.
+    var followPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    followPointHandler.setInputAction(function(movement) {
+      if (movement.endPosition) {
+          var cartesian = viewer.camera.pickEllipsoid(movement.endPosition, viewer.scene.globe.ellipsoid);
+          if (cartesian) {
+            positions.pop();
+            positions.push( cartesian );
+          }
+        }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+    var finishPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    finishPointHandler.setInputAction(function(movement) {
+        var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
+        if (cartesian) {
+          positions.push( cartesian );
+        }
+
+        followPointHandler.destroy();
+        addPointHandler.destroy();
+    }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+
+    // If the mouse is over the billboard, change its scale and color
+    var hoverHandle = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    hoverHandle.setInputAction(function(movement) {
+        var pickedObject = viewer.scene.pick(movement.endPosition);
+        if (Cesium.defined(pickedObject) && (pickedObject.id === entity)) {
+            entity.polyline.width = 8;
+            entity.polyline.material = Cesium.Color.YELLOW;
+            entity.polygon.material = Cesium.Color.YELLOW.withAlpha(0.5);
+        } else {
+            entity.polyline.width = 2;
+            entity.polyline.material = Cesium.Color.RED;
+            entity.polygon.material = Cesium.Color.ORANGE.withAlpha(0.5);
+        }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+
+
+    </script>
+
+</body>
+</html>
+
+
