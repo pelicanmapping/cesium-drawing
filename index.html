@@ -32,6 +32,18 @@
 
     var viewer = new Cesium.Viewer('cesiumContainer');
 
+    function createDragger(position, onDrag) {
+       var dragger = viewer.entities.add({
+          position : position,
+          billboard :{
+              image : "../img/dragIcon.png"
+          }
+      });
+      dragger._isDragger = true;
+      dragger.onDrag = onDrag;
+      return dragger;
+    }
+
 
     // The list of positions to modify.
     var positions = [];
@@ -46,7 +58,9 @@
             }),
             width : 2,
             material : Cesium.Color.RED
-        },
+        }
+        /*
+
         polygon : {
             hierarchy : new Cesium.CallbackProperty(function(time, result) {
               return positions;
@@ -57,14 +71,25 @@
             outline : true,
             outlineColor : Cesium.Color.BLACK
         }
+        */
     });
+
+
+    var draggers = [];
 
     // Adds a point to the positions list.
     var addPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     addPointHandler.setInputAction(function(movement) {
         var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
         if (cartesian) {
+          var index = positions.length;
           positions.push( cartesian );
+          var dragger = createDragger( cartesian, function(dragger, position) {
+              dragger.positions[dragger.index] = position;
+          });
+          dragger.index = index;
+          dragger.positions = positions;
+          draggers.push( dragger );
         }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -82,17 +107,19 @@
 
     var finishPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     finishPointHandler.setInputAction(function(movement) {
-        var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
-        if (cartesian) {
-          positions.push( cartesian );
-        }
-
         followPointHandler.destroy();
         addPointHandler.destroy();
+
+        // Get rid of all the draggers.
+        /*
+        for (var i = 0; i < draggers.length; i++) {
+          viewer.entities.remove( draggers[i]);
+        }
+        draggers = [];
+        */
     }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
 
-    // If the mouse is over the billboard, change its scale and color
     var hoverHandle = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     hoverHandle.setInputAction(function(movement) {
         var pickedObject = viewer.scene.pick(movement.endPosition);
@@ -108,6 +135,56 @@
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
 
+
+
+    // Add a billboard we can drag around.
+    //createDragger(Cesium.Cartesian3.fromDegrees(-75, 40));
+    //createDragger(Cesium.Cartesian3.fromDegrees(-76, 41));
+    //createDragger(Cesium.Cartesian3.fromDegrees(-77, 42));
+
+    var draggerHandler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
+    draggerHandler.dragger = null;
+
+    draggerHandler.setInputAction(
+        function(click) {
+            var pickedObject = viewer.scene.pick(click.position);
+            if (Cesium.defined(pickedObject)) {
+                var entity = pickedObject.id;
+                if (Cesium.defaultValue(entity._isDragger, false)) {
+                  entity.billboard.scale = 1.2;
+                  draggerHandler.dragger = entity;
+                  viewer.scene.screenSpaceCameraController.enableRotate = false;
+                }
+            }
+        },
+        Cesium.ScreenSpaceEventType.LEFT_DOWN
+    );
+
+    draggerHandler.setInputAction(
+        function(movement) {
+            if (draggerHandler.dragger) {
+              var hit = viewer.camera.pickEllipsoid(movement.endPosition);
+                if (hit) {
+                  draggerHandler.dragger.position = hit;
+                  if (draggerHandler.dragger.onDrag) {
+                    draggerHandler.dragger.onDrag(draggerHandler.dragger, hit);
+                  }
+                }
+            }
+        },
+        Cesium.ScreenSpaceEventType.MOUSE_MOVE
+    );
+
+    draggerHandler.setInputAction(
+        function() {
+            if (draggerHandler.dragger) {
+              draggerHandler.dragger.billboard.scale = 1;
+              draggerHandler.dragger = null;
+              viewer.scene.screenSpaceCameraController.enableRotate = true;
+            }
+        },
+        Cesium.ScreenSpaceEventType.LEFT_UP
+    );
 
     </script>
 
