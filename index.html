@@ -32,6 +32,9 @@
 
     var viewer = new Cesium.Viewer('cesiumContainer');
 
+    // Disable the default entity double click action.
+    viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
     function createDragger(position, onDrag) {
        var dragger = viewer.entities.add({
           position : position,
@@ -78,10 +81,15 @@
     var draggers = [];
 
     // Adds a point to the positions list.
-    var addPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    addPointHandler.setInputAction(function(movement) {
+    var drawPolylineHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    drawPolylineHandler.lastPointTemporary = false;
+    drawPolylineHandler.setInputAction(function(movement) {
         var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
         if (cartesian) {
+          if (drawPolylineHandler.lastPointTemporary)
+          {
+              positions.pop();
+          }
           var index = positions.length;
           positions.push( cartesian );
           var dragger = createDragger( cartesian, function(dragger, position) {
@@ -90,26 +98,28 @@
           dragger.index = index;
           dragger.positions = positions;
           draggers.push( dragger );
+
+          drawPolylineHandler.lastPointTemporary = false;
         }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     // Replaces the last point in the list with the point under the mouse.
-    var followPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    followPointHandler.setInputAction(function(movement) {
+    drawPolylineHandler.setInputAction(function(movement) {
       if (movement.endPosition) {
           var cartesian = viewer.camera.pickEllipsoid(movement.endPosition, viewer.scene.globe.ellipsoid);
           if (cartesian) {
-            positions.pop();
+            if (drawPolylineHandler.lastPointTemporary)
+            {
+              positions.pop();
+            }
             positions.push( cartesian );
+            drawPolylineHandler.lastPointTemporary = true;
           }
         }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-    var finishPointHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    finishPointHandler.setInputAction(function(movement) {
-        followPointHandler.destroy();
-        addPointHandler.destroy();
-
+    drawPolylineHandler.setInputAction(function(movement) {
+        drawPolylineHandler.destroy();
         // Get rid of all the draggers.
         /*
         for (var i = 0; i < draggers.length; i++) {
@@ -120,6 +130,7 @@
     }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
 
+    /*
     var hoverHandle = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     hoverHandle.setInputAction(function(movement) {
         var pickedObject = viewer.scene.pick(movement.endPosition);
@@ -133,6 +144,7 @@
             entity.polygon.material = Cesium.Color.ORANGE.withAlpha(0.5);
         }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+*/
 
 
 
