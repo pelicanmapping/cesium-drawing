@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
   <title>Cesium Drawing</title>
   <script src="Cesium/Cesium/Cesium.js"></script>
+  <script src="js/jquery-3.1.1.min.js"></script>
   <style>
     @import url(Cesium/Cesium/Widgets/widgets.css);
       html, body, #cesiumContainer {
@@ -21,19 +22,143 @@
         overflow: hidden;
       }
 
+      .toolbar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: #ffffff;
+      }
+
+      .toolbar > .button {
+        cursor: pointer;
+        padding: 2px;
+      }
+
+      .toolbar > .button:hover {
+        background: #eee;
+      }
+
 
   </style>
 </head>
 <body>
 
     <div id="cesiumContainer"></div>
-    <script>
 
+    <div class="toolbar">
+      <div id="drawPolyline" class="button">
+          <span><img src="img/drawPolyline.png"></img></span>
+      </div>
+      <div id="drawPolygon" class="button">
+          <span><img src="img/drawPolygon.png"></img></span>
+      </div>
+    </div>
+
+    <script>
 
     var viewer = new Cesium.Viewer('cesiumContainer');
 
     // Disable the default entity double click action.
     viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+    function createPositionsHandler(positions) {
+
+      var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+      var draggers = [];
+
+      // Adds a point to the positions list.
+      handler.lastPointTemporary = false;
+      handler.setInputAction(function(movement) {
+          var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
+          if (cartesian) {
+            if (handler.lastPointTemporary)
+            {
+                positions.pop();
+            }
+            var index = positions.length;
+            positions.push( cartesian );
+            var dragger = createDragger( cartesian, function(dragger, position) {
+                dragger.positions[dragger.index] = position;
+            });
+            dragger.index = index;
+            dragger.positions = positions;
+            draggers.push( dragger );
+
+            handler.lastPointTemporary = false;
+          }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+      // Replaces the last point in the list with the point under the mouse.
+      handler.setInputAction(function(movement) {
+        if (movement.endPosition) {
+            var cartesian = viewer.camera.pickEllipsoid(movement.endPosition, viewer.scene.globe.ellipsoid);
+            if (cartesian) {
+              if (handler.lastPointTemporary)
+              {
+                positions.pop();
+              }
+              positions.push( cartesian );
+              handler.lastPointTemporary = true;
+            }
+          }
+      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+      handler.setInputAction(function(movement) {
+          handler.destroy();
+          // Get rid of all the draggers.
+          /*
+          for (var i = 0; i < draggers.length; i++) {
+            viewer.entities.remove( draggers[i]);
+          }
+          draggers = [];
+          */
+      }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+      return handler;
+    }
+
+
+    function drawPolyline() {
+
+      // The list of positions to modify.
+      var positions = [];
+
+      // Create the entity
+      var entity = viewer.entities.add({
+          name : 'Entity',
+          polyline : {
+              // We need to use a callback property to ensure that this geometry is not built in a web worker
+              // so we can update it on the fly.
+              positions : new Cesium.CallbackProperty(function(time, result) {
+                return positions;
+              }),
+              width : 2,
+              material : Cesium.Color.RED
+          }
+      });
+
+      createPositionsHandler( positions );
+    }
+
+    function drawPolygon() {
+
+      // The list of positions to modify.
+      var positions = [];
+
+      // Create the entity
+      var entity = viewer.entities.add({
+          name : 'Entity',
+          polygon : {
+            hierarchy : new Cesium.CallbackProperty(function(time, result) {
+                return positions;
+            }),
+            material : Cesium.Color.RED
+          }
+      });
+
+      createPositionsHandler( positions );
+    }
 
     function createDragger(position, onDrag) {
        var dragger = viewer.entities.add({
@@ -46,113 +171,6 @@
       dragger.onDrag = onDrag;
       return dragger;
     }
-
-
-    // The list of positions to modify.
-    var positions = [];
-
-    var entity = viewer.entities.add({
-        name : 'Entity',
-        polyline : {
-            // We need to use a callback property to ensure that this geometry is not built in a web worker
-            // so we can update it on the fly.
-            positions : new Cesium.CallbackProperty(function(time, result) {
-              return positions;
-            }),
-            width : 2,
-            material : Cesium.Color.RED
-        }
-        /*
-
-        polygon : {
-            hierarchy : new Cesium.CallbackProperty(function(time, result) {
-              return positions;
-            }),
-            extrudedHeight: 50000,
-            perPositionHeight : true,
-            material : Cesium.Color.ORANGE.withAlpha(0.5),
-            outline : true,
-            outlineColor : Cesium.Color.BLACK
-        }
-        */
-    });
-
-
-    var draggers = [];
-
-    // Adds a point to the positions list.
-    var drawPolylineHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    drawPolylineHandler.lastPointTemporary = false;
-    drawPolylineHandler.setInputAction(function(movement) {
-        var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
-        if (cartesian) {
-          if (drawPolylineHandler.lastPointTemporary)
-          {
-              positions.pop();
-          }
-          var index = positions.length;
-          positions.push( cartesian );
-          var dragger = createDragger( cartesian, function(dragger, position) {
-              dragger.positions[dragger.index] = position;
-          });
-          dragger.index = index;
-          dragger.positions = positions;
-          draggers.push( dragger );
-
-          drawPolylineHandler.lastPointTemporary = false;
-        }
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-    // Replaces the last point in the list with the point under the mouse.
-    drawPolylineHandler.setInputAction(function(movement) {
-      if (movement.endPosition) {
-          var cartesian = viewer.camera.pickEllipsoid(movement.endPosition, viewer.scene.globe.ellipsoid);
-          if (cartesian) {
-            if (drawPolylineHandler.lastPointTemporary)
-            {
-              positions.pop();
-            }
-            positions.push( cartesian );
-            drawPolylineHandler.lastPointTemporary = true;
-          }
-        }
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-    drawPolylineHandler.setInputAction(function(movement) {
-        drawPolylineHandler.destroy();
-        // Get rid of all the draggers.
-        /*
-        for (var i = 0; i < draggers.length; i++) {
-          viewer.entities.remove( draggers[i]);
-        }
-        draggers = [];
-        */
-    }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-
-
-    /*
-    var hoverHandle = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    hoverHandle.setInputAction(function(movement) {
-        var pickedObject = viewer.scene.pick(movement.endPosition);
-        if (Cesium.defined(pickedObject) && (pickedObject.id === entity)) {
-            entity.polyline.width = 8;
-            entity.polyline.material = Cesium.Color.YELLOW;
-            entity.polygon.material = Cesium.Color.YELLOW.withAlpha(0.5);
-        } else {
-            entity.polyline.width = 2;
-            entity.polyline.material = Cesium.Color.RED;
-            entity.polygon.material = Cesium.Color.ORANGE.withAlpha(0.5);
-        }
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-*/
-
-
-
-
-    // Add a billboard we can drag around.
-    //createDragger(Cesium.Cartesian3.fromDegrees(-75, 40));
-    //createDragger(Cesium.Cartesian3.fromDegrees(-76, 41));
-    //createDragger(Cesium.Cartesian3.fromDegrees(-77, 42));
 
     var draggerHandler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
     draggerHandler.dragger = null;
@@ -197,6 +215,17 @@
         },
         Cesium.ScreenSpaceEventType.LEFT_UP
     );
+
+    $(function() {
+      $("#drawPolyline").click(function() {
+        drawPolyline();
+      });
+
+      $("#drawPolygon").click(function() {
+        drawPolygon();
+      });
+
+    });
 
     </script>
 
