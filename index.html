@@ -52,6 +52,9 @@
       <div id="drawPolygon" class="button">
           <span><img src="img/drawPolygon.png"></img></span>
       </div>
+      <div id="drawExtrudedPolygon" class="button">
+          <span><img src="img/drawExtrudedPolygon.png"></img></span>
+      </div>
     </div>
 
     <script>
@@ -160,6 +163,29 @@
       createPositionsHandler( positions );
     }
 
+    function drawExtrudedPolygon() {
+
+      // The list of positions to modify.
+      var positions = [];
+
+      // Create the entity
+      var entity = viewer.entities.add({
+          name : 'Entity',
+          polygon : {
+            hierarchy : new Cesium.CallbackProperty(function(time, result) {
+              return positions;
+            }),
+            extrudedHeight: 50000,
+            perPositionHeight : true,
+            material : Cesium.Color.ORANGE.withAlpha(0.5),
+            outline : true,
+            outlineColor : Cesium.Color.BLACK
+        }
+      });
+
+      createPositionsHandler( positions );
+    }
+
     function createDragger(position, onDrag) {
        var dragger = viewer.entities.add({
           position : position,
@@ -223,6 +249,10 @@
 
       $("#drawPolygon").click(function() {
         drawPolygon();
+      });
+
+      $("#drawExtrudedPolygon").click(function() {
+        drawExtrudedPolygon();
       });
 
     });
