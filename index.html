@@ -55,6 +55,9 @@
       <div id="drawExtrudedPolygon" class="button">
           <span><img src="img/drawExtrudedPolygon.png"></img></span>
       </div>
+      <div id="drawCircle" class="button">
+          <span><img src="img/drawCircle.png"></img></span>
+      </div>
     </div>
 
     <script>
@@ -186,6 +189,32 @@
       createPositionsHandler( positions );
     }
 
+    function drawCircle() {
+
+      var position = Cesium.Cartesian3.fromDegrees(-103.0, 40.0);
+
+      // Create an ellipse.
+      // Should really wait for the first click.
+      var entity = viewer.entities.add({
+        position: new Cesium.CallbackProperty(function(time, result) {
+          return position;
+        }),
+        name : 'Entity',
+        ellipse : {
+            semiMinorAxis : 300000.0,
+            semiMajorAxis : 300000.0,
+            material : Cesium.Color.GREEN.withAlpha(0.5),
+            outline : true,
+            outlineColor : Cesium.Color.BLACK
+        }
+      });
+
+      // Create a dragger that just modifies the entities position.
+      createDragger(position, function(dragger, newPosition) {
+        position = newPosition;
+      });
+    }
+
     function createDragger(position, onDrag) {
        var dragger = viewer.entities.add({
           position : position,
@@ -253,6 +282,10 @@
 
       $("#drawExtrudedPolygon").click(function() {
         drawExtrudedPolygon();
+      });
+
+      $("#drawCircle").click(function() {
+        drawCircle();
       });
 
     });
