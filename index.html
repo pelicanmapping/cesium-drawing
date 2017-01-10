@@ -62,16 +62,17 @@
 
     <script>
 
-    var viewer = new Cesium.Viewer('cesiumContainer');
+    var viewer = new Cesium.Viewer('cesiumContainer', {
+      selectionIndicator : false
+    });
 
     // Disable the default entity double click action.
     viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+    viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-    function createPositionsHandler(positions) {
+    function createPositionsHandler(entity, positions) {
 
       var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-
-      var draggers = [];
 
       // Adds a point to the positions list.
       handler.lastPointTemporary = false;
@@ -84,12 +85,15 @@
             }
             var index = positions.length;
             positions.push( cartesian );
+
+            /*
             var dragger = createDragger( cartesian, function(dragger, position) {
                 dragger.positions[dragger.index] = position;
             });
             dragger.index = index;
             dragger.positions = positions;
             draggers.push( dragger );
+            */
 
             handler.lastPointTemporary = false;
           }
@@ -111,6 +115,7 @@
       }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
       handler.setInputAction(function(movement) {
+          entity.inProgress = false;
           handler.destroy();
           // Get rid of all the draggers.
           /*
@@ -144,7 +149,10 @@
           }
       });
 
-      createPositionsHandler( positions );
+      // TODO:  Use a different property instead of this hack and the CallbackProperty.
+      entity.polyline._positionsArray = positions;
+      entity.inProgress = true;
+      createPositionsHandler( entity, positions );
     }
 
     function drawPolygon() {
@@ -163,7 +171,9 @@
           }
       });
 
-      createPositionsHandler( positions );
+      entity.polygon._positionsArray = positions;
+
+      createPositionsHandler( entity, positions );
     }
 
     function drawExtrudedPolygon() {
@@ -186,7 +196,9 @@
         }
       });
 
-      createPositionsHandler( positions );
+      entity.polygon._positionsArray = positions;
+
+      createPositionsHandler( entity, positions );
     }
 
     function drawCircle() {
@@ -197,7 +209,7 @@
       // Should really wait for the first click.
       var entity = viewer.entities.add({
         position: new Cesium.CallbackProperty(function(time, result) {
-          return position;
+          return entity._positionVar;
         }),
         name : 'Entity',
         ellipse : {
@@ -209,10 +221,53 @@
         }
       });
 
-      // Create a dragger that just modifies the entities position.
-      createDragger(position, function(dragger, newPosition) {
-        position = newPosition;
-      });
+      entity.inProgress = false;
+      entity._positionVar = position;
+    }
+
+    var draggers = [];
+    var currentEntity = null;
+
+    function startEditing( entity ) {
+      if (entity.polyline) {
+        var positions = entity.polyline._positionsArray;
+        for (var i = 0; i < positions.length; i++) {
+            var loc = positions[i];
+            var dragger = createDragger( loc, function(dragger, position) {
+                dragger.positions[dragger.index] = position;
+            });
+            dragger.index = i;
+            dragger.positions = positions;
+            draggers.push( dragger );
+        }
+      }
+      else if (entity.polygon) {
+        var positions = entity.polygon._positionsArray;
+        for (var i = 0; i < positions.length; i++) {
+            var loc = positions[i];
+            var dragger = createDragger( loc, function(dragger, position) {
+                dragger.positions[dragger.index] = position;
+            });
+            dragger.index = i;
+            dragger.positions = positions;
+            draggers.push( dragger );
+        }
+      }
+      else if (entity.ellipse) {
+        // Create a dragger that just modifies the entities position.
+        var dragger = createDragger(entity._positionVar, function(dragger, newPosition) {
+          entity._positionVar = newPosition;
+        });
+        draggers.push( dragger );
+      }
+    }
+
+    function stopEditing( entity ) {
+      // Get rid of all the draggers.
+      for (var i = 0; i < draggers.length; i++) {
+        viewer.entities.remove( draggers[i]);
+      }
+      draggers = [];
     }
 
     function createDragger(position, onDrag) {
@@ -270,6 +325,42 @@
         },
         Cesium.ScreenSpaceEventType.LEFT_UP
     );
+
+
+
+    var selectEntityHandler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
+    selectEntityHandler.setInputAction(
+        function(e) {
+            var picked = viewer.scene.pick(e.position);
+
+            var pickedEntity = null;
+
+            if (Cesium.defined(picked)) {
+                var id = Cesium.defaultValue(picked.id, picked.primitive.id);
+                if (id instanceof Cesium.Entity) {
+                    var inProgress = Cesium.defaultValue( id.inProgress, true);
+                    if (!inProgress) {
+                        pickedEntity = id;
+                    }
+                }
+            }
+
+            if (pickedEntity !== currentEntity) {
+              if (currentEntity) {
+                stopEditing( currentEntity );
+                currentEntity = null;
+              }
+
+              currentEntity = pickedEntity;
+
+              if (currentEntity) {
+                startEditing(currentEntity);
+              }
+            }
+        },
+        Cesium.ScreenSpaceEventType.LEFT_CLICK
+    );
+
 
     $(function() {
       $("#drawPolyline").click(function() {
