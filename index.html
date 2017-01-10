@@ -256,9 +256,35 @@
       else if (entity.ellipse) {
         // Create a dragger that just modifies the entities position.
         var dragger = createDragger(entity._positionVar, function(dragger, newPosition) {
+
+          var diff = new Cesium.Cartesian3();
+          Cesium.Cartesian3.subtract(newPosition, entity._positionVar, diff);
           entity._positionVar = newPosition;
+
+
+          var newPos = new Cesium.Cartesian3();
+          Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
+          dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
+
         });
         draggers.push( dragger );
+
+
+        var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
+          center: entity._positionVar,
+          semiMinorAxis: entity.ellipse.semiMinorAxis._value,
+          semiMajorAxis: entity.ellipse.semiMajorAxis._value,
+          rotation: 0.0,
+          granularity: 2.0
+        }, true, false);
+        var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
+        var radiusDragger = createDragger(pos, function(dragger, newPosition) {
+          var radius = Cesium.Cartesian3.distance(entity._positionVar, newPosition);
+          entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
+          entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
+        });
+        dragger.radiusDragger = radiusDragger;
+        draggers.push( radiusDragger );
       }
     }
 
