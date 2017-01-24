@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
   <title>Cesium Drawing</title>
   <script src="Cesium/Cesium/Cesium.js"></script>
+  <script src="js/DynamicProperty.js"></script>
   <script src="js/jquery-3.1.1.min.js"></script>
   <style>
     @import url(Cesium/Cesium/Widgets/widgets.css);
@@ -85,16 +86,6 @@
             }
             var index = positions.length;
             positions.push( cartesian );
-
-            /*
-            var dragger = createDragger( cartesian, function(dragger, position) {
-                dragger.positions[dragger.index] = position;
-            });
-            dragger.index = index;
-            dragger.positions = positions;
-            draggers.push( dragger );
-            */
-
             handler.lastPointTemporary = false;
           }
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -117,13 +108,6 @@
       handler.setInputAction(function(movement) {
           entity.inProgress = false;
           handler.destroy();
-          // Get rid of all the draggers.
-          /*
-          for (var i = 0; i < draggers.length; i++) {
-            viewer.entities.remove( draggers[i]);
-          }
-          draggers = [];
-          */
       }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
       return handler;
@@ -132,62 +116,41 @@
 
     function drawPolyline() {
 
-      // The list of positions to modify.
-      var positions = [];
-
       // Create the entity
       var entity = viewer.entities.add({
           name : 'Entity',
           polyline : {
-              // We need to use a callback property to ensure that this geometry is not built in a web worker
-              // so we can update it on the fly.
-              positions : new Cesium.CallbackProperty(function(time, result) {
-                return positions;
-              }),
+              positions: new DynamicProperty([]),
               width : 2,
               material : Cesium.Color.RED
           }
       });
 
-      // TODO:  Use a different property instead of this hack and the CallbackProperty.
-      entity.polyline._positionsArray = positions;
       entity.inProgress = true;
-      createPositionsHandler( entity, positions );
+      createPositionsHandler( entity, entity.polyline.positions._value );
     }
 
     function drawPolygon() {
 
-      // The list of positions to modify.
-      var positions = [];
-
       // Create the entity
       var entity = viewer.entities.add({
           name : 'Entity',
           polygon : {
-            hierarchy : new Cesium.CallbackProperty(function(time, result) {
-                return positions;
-            }),
+            hierarchy: new DynamicProperty([]),
             material : Cesium.Color.RED
           }
       });
 
-      entity.polygon._positionsArray = positions;
-
-      createPositionsHandler( entity, positions );
+      createPositionsHandler( entity, entity.polygon.hierarchy._value );
     }
 
     function drawExtrudedPolygon() {
-
-      // The list of positions to modify.
-      var positions = [];
 
       // Create the entity
       var entity = viewer.entities.add({
           name : 'Entity',
           polygon : {
-            hierarchy : new Cesium.CallbackProperty(function(time, result) {
-              return positions;
-            }),
+            hierarchy: new DynamicProperty([]),
             extrudedHeight: 50000,
             perPositionHeight : true,
             material : Cesium.Color.ORANGE.withAlpha(0.5),
@@ -196,9 +159,7 @@
         }
       });
 
-      entity.polygon._positionsArray = positions;
-
-      createPositionsHandler( entity, positions );
+      createPositionsHandler( entity, entity.polygon.hierachy._value );
     }
 
     function drawCircle() {
@@ -208,9 +169,7 @@
       // Create an ellipse.
       // Should really wait for the first click.
       var entity = viewer.entities.add({
-        position: new Cesium.CallbackProperty(function(time, result) {
-          return entity._positionVar;
-        }),
+        position: new DynamicProperty(position),
         name : 'Entity',
         ellipse : {
             semiMinorAxis : 300000.0,
@@ -222,7 +181,6 @@
       });
 
       entity.inProgress = false;
-      entity._positionVar = position;
     }
 
     var draggers = [];
@@ -230,7 +188,7 @@
 
     function startEditing( entity ) {
       if (entity.polyline) {
-        var positions = entity.polyline._positionsArray;
+        var positions = entity.polyline.positions._value;
         for (var i = 0; i < positions.length; i++) {
             var loc = positions[i];
             var dragger = createDragger( loc, function(dragger, position) {
@@ -242,7 +200,7 @@
         }
       }
       else if (entity.polygon) {
-        var positions = entity.polygon._positionsArray;
+        var positions = entity.polygon.hierarchy._value;
         for (var i = 0; i < positions.length; i++) {
             var loc = positions[i];
             var dragger = createDragger( loc, function(dragger, position) {
@@ -255,11 +213,11 @@
       }
       else if (entity.ellipse) {
         // Create a dragger that just modifies the entities position.
-        var dragger = createDragger(entity._positionVar, function(dragger, newPosition) {
+        var dragger = createDragger(entity.position._value, function(dragger, newPosition) {
 
           var diff = new Cesium.Cartesian3();
-          Cesium.Cartesian3.subtract(newPosition, entity._positionVar, diff);
-          entity._positionVar = newPosition;
+          Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
+          entity.position._value = newPosition;
 
 
           var newPos = new Cesium.Cartesian3();
@@ -271,7 +229,7 @@
 
 
         var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
-          center: entity._positionVar,
+          center: entity.position._value,
           semiMinorAxis: entity.ellipse.semiMinorAxis._value,
           semiMajorAxis: entity.ellipse.semiMajorAxis._value,
           rotation: 0.0,
@@ -279,7 +237,7 @@
         }, true, false);
         var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
         var radiusDragger = createDragger(pos, function(dragger, newPosition) {
-          var radius = Cesium.Cartesian3.distance(entity._positionVar, newPosition);
+          var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
           entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
           entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
         });
@@ -351,8 +309,6 @@
         },
         Cesium.ScreenSpaceEventType.LEFT_UP
     );
-
-
 
     var selectEntityHandler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
     selectEntityHandler.setInputAction(
