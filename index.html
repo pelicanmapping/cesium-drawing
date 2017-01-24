@@ -189,6 +189,7 @@
     function startEditing( entity ) {
       if (entity.polyline) {
         var positions = entity.polyline.positions._value;
+        entity.polyline.positions.isConstant = false;
         for (var i = 0; i < positions.length; i++) {
             var loc = positions[i];
             var dragger = createDragger( loc, function(dragger, position) {
@@ -201,6 +202,7 @@
       }
       else if (entity.polygon) {
         var positions = entity.polygon.hierarchy._value;
+        entity.polygon.hierarchy.isConstant = false;
         for (var i = 0; i < positions.length; i++) {
             var loc = positions[i];
             var dragger = createDragger( loc, function(dragger, position) {
@@ -247,6 +249,16 @@
     }
 
     function stopEditing( entity ) {
+      // Mark the position properties as being constant since we are done editing.
+      // You will see a flash as the geometry rebuilds, but rendering performance of the static geometries will
+      // be faster.
+      if (entity.polyline) {
+        entity.polyline.positions.isConstant = true;
+      }
+      else if (entity.polygon) {
+        entity.polygon.hierarchy.isConstant = true;
+      }
+
       // Get rid of all the draggers.
       for (var i = 0; i < draggers.length; i++) {
         viewer.entities.remove( draggers[i]);

@@ -16,6 +16,7 @@ function DynamicProperty(value) {
     this._hasClone = false;
     this._hasEquals = false;
     this._definitionChanged = new Cesium.Event();
+    this._constant = false;
     this.setValue(value);
 }
 
@@ -29,7 +30,15 @@ Cesium.defineProperties(DynamicProperty.prototype, {
      * @readonly
      */
     isConstant : {
-        value : false
+        get: function() {
+            return this._constant;
+        },
+        set: function(value) {
+            if (this._constant !== value) {
+                this._constant = value;
+                this._definitionChanged.raiseEvent(this);
+            }
+        }
     },
     /**
      * Gets the event that is raised whenever the definition of this property changes.
