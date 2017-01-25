@@ -8,9 +8,13 @@
   <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
   <title>Cesium Drawing</title>
+
+  <script src="js/jquery-3.1.1.min.js"></script>
   <script src="Cesium/Cesium/Cesium.js"></script>
   <script src="js/DynamicProperty.js"></script>
-  <script src="js/jquery-3.1.1.min.js"></script>
+  <script src="js/CesiumDrawing.js"></script>
+
+
   <style>
     @import url(Cesium/Cesium/Widgets/widgets.css);
       html, body, #cesiumContainer {
@@ -41,6 +45,7 @@
 
 
   </style>
+
 </head>
 <body>
 
@@ -63,20 +68,6 @@
 
     <script>
 
-    Cesium.Entity.prototype.enableEditing = function() {
-      this.startEdit = new Cesium.Event();
-      this.stopEdit = new Cesium.Event();
-
-      this.startEditing = function() {
-        this.startEdit.raiseEvent(this);
-      };
-
-      this.stopEditing = function() {
-          this.stopEdit.raiseEvent(this);
-      };
-    };
-
-
     var viewer = new Cesium.Viewer('cesiumContainer', {
       selectionIndicator : false
     });
@@ -85,47 +76,7 @@
     viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
     viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-    function createPositionsHandler(entity, positions) {
-
-      var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-
-      // Adds a point to the positions list.
-      handler.lastPointTemporary = false;
-      handler.setInputAction(function(movement) {
-          var cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid);
-          if (cartesian) {
-            if (handler.lastPointTemporary)
-            {
-                positions.pop();
-            }
-            var index = positions.length;
-            positions.push( cartesian );
-            handler.lastPointTemporary = false;
-          }
-      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-      // Replaces the last point in the list with the point under the mouse.
-      handler.setInputAction(function(movement) {
-        if (movement.endPosition) {
-            var cartesian = viewer.camera.pickEllipsoid(movement.endPosition, viewer.scene.globe.ellipsoid);
-            if (cartesian) {
-              if (handler.lastPointTemporary)
-              {
-                positions.pop();
-              }
-              positions.push( cartesian );
-              handler.lastPointTemporary = true;
-            }
-          }
-      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-      handler.setInputAction(function(movement) {
-          entity.inProgress = false;
-          handler.destroy();
-      }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-
-      return handler;
-    }
+    var editor = new CesiumDrawing.Editor( viewer );
 
 
     function startEdit(entity) {
@@ -139,7 +90,7 @@
     }
 
     function stopEdit(entity) {
-       // Editing mode is starting, so change the style.
+       // Editing mode is ended, so change the style.
         if (entity.polyline) {
           entity.polyline.material = Cesium.Color.RED;
         }
@@ -160,10 +111,10 @@
               material : Cesium.Color.RED
           }
       });
-      entity.enableEditing();
+      CesiumDrawing.extendEntity(entity);
 
       entity.inProgress = true;
-      createPositionsHandler( entity, entity.polyline.positions._value );
+      editor.createPositionsHandler( entity, entity.polyline.positions._value );
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
@@ -179,9 +130,9 @@
             material : Cesium.Color.RED
           }
       });
-      entity.enableEditing();
+      CesiumDrawing.extendEntity( entity );
 
-      createPositionsHandler( entity, entity.polygon.hierarchy._value );
+      editor.createPositionsHandler( entity, entity.polygon.hierarchy._value );
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
@@ -201,9 +152,9 @@
             outlineColor : Cesium.Color.BLACK
         }
       });
-      entity.enableEditing();
+      CesiumDrawing.extendEntity( entity );
 
-      createPositionsHandler( entity, entity.polygon.hierarchy._value );
+      editor.createPositionsHandler( entity, entity.polygon.hierarchy._value );
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
@@ -224,159 +175,16 @@
             outlineColor : Cesium.Color.BLACK
         }
       });
-      entity.enableEditing();
+      CesiumDrawing.extendEntity( entity );
 
       entity.inProgress = false;
     }
 
-    var draggers = [];
     var currentEntity = null;
-
-    function startEditing( entity ) {
-      entity.startEditing();
-
-      if (entity.polyline) {
-        var positions = entity.polyline.positions._value;
-        entity.polyline.positions.isConstant = false;
-        for (var i = 0; i < positions.length; i++) {
-            var loc = positions[i];
-            var dragger = createDragger( loc, function(dragger, position) {
-                dragger.positions[dragger.index] = position;
-            });
-            dragger.index = i;
-            dragger.positions = positions;
-            draggers.push( dragger );
-        }
-      }
-      else if (entity.polygon) {
-        var positions = entity.polygon.hierarchy._value;
-        entity.polygon.hierarchy.isConstant = false;
-        for (var i = 0; i < positions.length; i++) {
-            var loc = positions[i];
-            var dragger = createDragger( loc, function(dragger, position) {
-                dragger.positions[dragger.index] = position;
-            });
-            dragger.index = i;
-            dragger.positions = positions;
-            draggers.push( dragger );
-        }
-      }
-      else if (entity.ellipse) {
-        // Create a dragger that just modifies the entities position.
-        var dragger = createDragger(entity.position._value, function(dragger, newPosition) {
-
-          var diff = new Cesium.Cartesian3();
-          Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
-          entity.position._value = newPosition;
-
-
-          var newPos = new Cesium.Cartesian3();
-          Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
-          dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
-
-        });
-        draggers.push( dragger );
-
-
-        var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
-          center: entity.position._value,
-          semiMinorAxis: entity.ellipse.semiMinorAxis._value,
-          semiMajorAxis: entity.ellipse.semiMajorAxis._value,
-          rotation: 0.0,
-          granularity: 2.0
-        }, true, false);
-        var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
-        var radiusDragger = createDragger(pos, function(dragger, newPosition) {
-          var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
-          entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
-          entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
-        });
-        dragger.radiusDragger = radiusDragger;
-        draggers.push( radiusDragger );
-      }
-    }
-
-    function stopEditing( entity ) {
-
-      entity.stopEditing();
-
-      // Mark the position properties as being constant since we are done editing.
-      // You will see a flash as the geometry rebuilds, but rendering performance of the static geometries will
-      // be faster.
-      if (entity.polyline) {
-        entity.polyline.positions.isConstant = true;
-      }
-      else if (entity.polygon) {
-        entity.polygon.hierarchy.isConstant = true;
-      }
-
-      // Get rid of all the draggers.
-      for (var i = 0; i < draggers.length; i++) {
-        viewer.entities.remove( draggers[i]);
-      }
-      draggers = [];
-    }
-
-    function createDragger(position, onDrag) {
-       var dragger = viewer.entities.add({
-          position : position,
-          billboard :{
-              image : "img/dragIcon.png"
-          }
-      });
-      dragger._isDragger = true;
-      dragger.onDrag = onDrag;
-      return dragger;
-    }
-
-    var draggerHandler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
-    draggerHandler.dragger = null;
-
-    draggerHandler.setInputAction(
-        function(click) {
-            var pickedObject = viewer.scene.pick(click.position);
-            if (Cesium.defined(pickedObject)) {
-                var entity = pickedObject.id;
-                if (Cesium.defaultValue(entity._isDragger, false)) {
-                  entity.billboard.scale = 1.2;
-                  draggerHandler.dragger = entity;
-                  viewer.scene.screenSpaceCameraController.enableRotate = false;
-                }
-            }
-        },
-        Cesium.ScreenSpaceEventType.LEFT_DOWN
-    );
-
-    draggerHandler.setInputAction(
-        function(movement) {
-            if (draggerHandler.dragger) {
-              var hit = viewer.camera.pickEllipsoid(movement.endPosition);
-                if (hit) {
-                  draggerHandler.dragger.position = hit;
-                  if (draggerHandler.dragger.onDrag) {
-                    draggerHandler.dragger.onDrag(draggerHandler.dragger, hit);
-                  }
-                }
-            }
-        },
-        Cesium.ScreenSpaceEventType.MOUSE_MOVE
-    );
-
-    draggerHandler.setInputAction(
-        function() {
-            if (draggerHandler.dragger) {
-              draggerHandler.dragger.billboard.scale = 1;
-              draggerHandler.dragger = null;
-              viewer.scene.screenSpaceCameraController.enableRotate = true;
-            }
-        },
-        Cesium.ScreenSpaceEventType.LEFT_UP
-    );
-
     var selectEntityHandler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
     selectEntityHandler.setInputAction(
         function(e) {
-            var picked = viewer.scene.pick(e.position);
+            var picked = viewer.scene.pick( e.position );
 
             var pickedEntity = null;
 
@@ -392,14 +200,14 @@
 
             if (pickedEntity !== currentEntity) {
               if (currentEntity) {
-                stopEditing( currentEntity );
+                editor.stopEditing( currentEntity );
                 currentEntity = null;
               }
 
               currentEntity = pickedEntity;
 
               if (currentEntity) {
-                startEditing(currentEntity);
+                editor.startEditing(currentEntity);
               }
             }
         },
