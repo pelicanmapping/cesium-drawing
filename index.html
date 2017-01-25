@@ -63,6 +63,20 @@
 
     <script>
 
+    Cesium.Entity.prototype.enableEditing = function() {
+      this.startEdit = new Cesium.Event();
+      this.stopEdit = new Cesium.Event();
+
+      this.startEditing = function() {
+        this.startEdit.raiseEvent(this);
+      };
+
+      this.stopEditing = function() {
+          this.stopEdit.raiseEvent(this);
+      };
+    };
+
+
     var viewer = new Cesium.Viewer('cesiumContainer', {
       selectionIndicator : false
     });
@@ -114,41 +128,70 @@
     }
 
 
+    function startEdit(entity) {
+        // Editing mode is starting, so change the style.
+        if (entity.polyline) {
+          entity.polyline.material = Cesium.Color.YELLOW;
+        }
+        if (entity.polygon) {
+          entity.polygon.material = Cesium.Color.YELLOW;
+        }
+    }
+
+    function stopEdit(entity) {
+       // Editing mode is starting, so change the style.
+        if (entity.polyline) {
+          entity.polyline.material = Cesium.Color.RED;
+        }
+        if (entity.polygon) {
+          entity.polygon.material = Cesium.Color.RED;
+        }
+    }
+
+
     function drawPolyline() {
 
       // Create the entity
       var entity = viewer.entities.add({
-          name : 'Entity',
+          name : 'Entity ' + viewer.entities.values.length,
           polyline : {
               positions: new DynamicProperty([]),
               width : 2,
               material : Cesium.Color.RED
           }
       });
+      entity.enableEditing();
 
       entity.inProgress = true;
       createPositionsHandler( entity, entity.polyline.positions._value );
+
+      entity.startEdit.addEventListener(startEdit);
+      entity.stopEdit.addEventListener(stopEdit);
     }
 
     function drawPolygon() {
 
       // Create the entity
       var entity = viewer.entities.add({
-          name : 'Entity',
+          name : 'Entity ' + viewer.entities.values.length,
           polygon : {
             hierarchy: new DynamicProperty([]),
             material : Cesium.Color.RED
           }
       });
+      entity.enableEditing();
 
       createPositionsHandler( entity, entity.polygon.hierarchy._value );
+
+      entity.startEdit.addEventListener(startEdit);
+      entity.stopEdit.addEventListener(stopEdit);
     }
 
     function drawExtrudedPolygon() {
 
       // Create the entity
       var entity = viewer.entities.add({
-          name : 'Entity',
+          name : 'Entity ' + viewer.entities.values.length,
           polygon : {
             hierarchy: new DynamicProperty([]),
             extrudedHeight: 50000,
@@ -158,19 +201,21 @@
             outlineColor : Cesium.Color.BLACK
         }
       });
+      entity.enableEditing();
 
-      createPositionsHandler( entity, entity.polygon.hierachy._value );
+      createPositionsHandler( entity, entity.polygon.hierarchy._value );
+
+      entity.startEdit.addEventListener(startEdit);
+      entity.stopEdit.addEventListener(stopEdit);
     }
 
     function drawCircle() {
 
-      var position = Cesium.Cartesian3.fromDegrees(-103.0, 40.0);
-
       // Create an ellipse.
       // Should really wait for the first click.
       var entity = viewer.entities.add({
-        position: new DynamicProperty(position),
-        name : 'Entity',
+        position: new DynamicProperty(Cesium.Cartesian3.fromDegrees(-103.0, 40.0)),
+        name : 'Entity ' + viewer.entities.values.length,
         ellipse : {
             semiMinorAxis : 300000.0,
             semiMajorAxis : 300000.0,
@@ -179,6 +224,7 @@
             outlineColor : Cesium.Color.BLACK
         }
       });
+      entity.enableEditing();
 
       entity.inProgress = false;
     }
@@ -187,6 +233,8 @@
     var currentEntity = null;
 
     function startEditing( entity ) {
+      entity.startEditing();
+
       if (entity.polyline) {
         var positions = entity.polyline.positions._value;
         entity.polyline.positions.isConstant = false;
@@ -249,6 +297,9 @@
     }
 
     function stopEditing( entity ) {
+
+      entity.stopEditing();
+
       // Mark the position properties as being constant since we are done editing.
       // You will see a flash as the geometry rebuilds, but rendering performance of the static geometries will
       // be faster.
