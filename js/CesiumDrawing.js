@@ -65,14 +65,14 @@ CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
     // Create a dragger that just modifies the entities position.
     var dragger = this.createDragger(entity.position._value, function(dragger, newPosition) {
 
-	    var diff = new Cesium.Cartesian3();
-	    Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
-	    entity.position._value = newPosition;
+        var diff = new Cesium.Cartesian3();
+        Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
+        entity.position._value = newPosition;
 
 
-	    var newPos = new Cesium.Cartesian3();
-	    Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
-	    dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
+        var newPos = new Cesium.Cartesian3();
+        Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
+        dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
     });
     this.draggers.push( dragger );
 
@@ -136,9 +136,9 @@ CesiumDrawing.Editor.prototype.stopEditing = function( entity ) {
 CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
 
     // Create the handler.
-	var draggerHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.canvas);
+    var draggerHandler = new Cesium.ScreenSpaceEventHandler(this.viewer.canvas);
 
-	// Initialize the active dragger to null;
+    // Initialize the active dragger to null;
     draggerHandler.dragger = null;
 
     // Left down selects a dragger
@@ -152,10 +152,30 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
                   entity.billboard.scale = 1.2;
                   draggerHandler.dragger = entity;
                   this.viewer.scene.screenSpaceCameraController.enableRotate = false;
+                  this.viewer.scene.screenSpaceCameraController.enableTilt = false;
                 }
             }
         },
         Cesium.ScreenSpaceEventType.LEFT_DOWN
+    );
+
+        // Left down selects a dragger
+    draggerHandler.setInputAction(
+        function(click) {
+            var pickedObject = this.viewer.scene.pick(click.position);
+            if (Cesium.defined(pickedObject)) {
+                var entity = pickedObject.id;
+                if (Cesium.defaultValue(entity._isDragger, false)) {
+                  // Resize the dragger.
+                  entity.billboard.scale = 1.2;
+                  draggerHandler.dragger = entity;
+                  this.viewer.scene.screenSpaceCameraController.enableRotate = false;
+                  this.viewer.scene.screenSpaceCameraController.enableTilt = false;
+                }
+            }
+        },
+        Cesium.ScreenSpaceEventType.LEFT_DOWN,
+        Cesium.KeyboardEventModifier.CTRL
     );
 
     // Mouse move drags the draggers and calls their onDrag callback.
@@ -174,6 +194,40 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
         Cesium.ScreenSpaceEventType.MOUSE_MOVE
     );
 
+    var scratchBoundingSphere = new Cesium.BoundingSphere();
+
+    // Mouse move drags the draggers and calls their onDrag callback.
+    draggerHandler.setInputAction(
+        function(movement) {
+            if (draggerHandler.dragger) {
+                var dy = movement.endPosition.y - movement.startPosition.y;
+                var position = draggerHandler.dragger.position._value;
+                var tangentPlane = new Cesium.EllipsoidTangentPlane( position );
+
+                scratchBoundingSphere.center = position;
+                scratchBoundingSphere.radius = 1;
+
+                var metersPerPixel = viewer.scene.frameState.camera.getPixelSize(scratchBoundingSphere,
+                                                                                 viewer.scene.frameState.context.drawingBufferWidth,
+                                                                                 viewer.scene.frameState.context.drawingBufferHeight);
+
+                var zOffset = new Cesium.Cartesian3();
+
+                Cesium.Cartesian3.multiplyByScalar(tangentPlane.zAxis, -dy * metersPerPixel, zOffset);
+                var newPosition = Cesium.Cartesian3.clone(position);
+                Cesium.Cartesian3.add(position, zOffset, newPosition);
+
+                draggerHandler.dragger.position = newPosition;
+                if (draggerHandler.dragger.onDrag) {
+                    draggerHandler.dragger.onDrag(draggerHandler.dragger, newPosition);
+                }
+            }
+        },
+        Cesium.ScreenSpaceEventType.MOUSE_MOVE,
+        Cesium.KeyboardEventModifier.CTRL
+    );
+
+
     // Left up stops dragging.
     draggerHandler.setInputAction(
         function() {
@@ -181,9 +235,24 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
               draggerHandler.dragger.billboard.scale = 1;
               draggerHandler.dragger = null;
               this.viewer.scene.screenSpaceCameraController.enableRotate = true;
+              this.viewer.scene.screenSpaceCameraController.enableTilt = true;
             }
         },
         Cesium.ScreenSpaceEventType.LEFT_UP
+    );
+
+    // Left up stops dragging.
+    draggerHandler.setInputAction(
+        function() {
+            if (draggerHandler.dragger) {
+              draggerHandler.dragger.billboard.scale = 1;
+              draggerHandler.dragger = null;
+              this.viewer.scene.screenSpaceCameraController.enableRotate = true;
+              this.viewer.scene.screenSpaceCameraController.enableTilt = true;
+            }
+        },
+        Cesium.ScreenSpaceEventType.LEFT_UP,
+        Cesium.KeyboardEventModifier.CTRL
     );
 
     this.draggerHandler = draggerHandler;
