@@ -46,12 +46,13 @@ CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
         this.draggers.push( dragger );
     }
   }
-  else if (entity.polygon) {
+
+  if (entity.polygon) {
     var positions = entity.polygon.hierarchy._value;
     entity.polygon.hierarchy.isConstant = false;
     for (var i = 0; i < positions.length; i++) {
         var loc = positions[i];
-        var dragger = thiscreateDragger( loc, function(dragger, position) {
+        var dragger = this.createDragger( loc, function(dragger, position) {
             dragger.positions[dragger.index] = position;
         });
         dragger.index = i;
@@ -59,7 +60,8 @@ CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
         this.draggers.push( dragger );
     }
   }
-  else if (entity.ellipse) {
+
+  if (entity.ellipse) {
     // Create a dragger that just modifies the entities position.
     var dragger = this.createDragger(entity.position._value, function(dragger, newPosition) {
 
@@ -89,6 +91,20 @@ CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
     });
     dragger.radiusDragger = radiusDragger;
     this.draggers.push( radiusDragger );
+  }
+
+  if (entity.corridor) {
+    var positions = entity.corridor.positions._value;
+    entity.corridor.positions.isConstant = false;
+    for (var i = 0; i < positions.length; i++) {
+        var loc = positions[i];
+        var dragger = this.createDragger( loc, function(dragger, position) {
+            dragger.positions[dragger.index] = position;
+        });
+        dragger.index = i;
+        dragger.positions = positions;
+        this.draggers.push( dragger );
+    }
   }
 };
 
