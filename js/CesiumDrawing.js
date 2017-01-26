@@ -59,6 +59,23 @@ CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
         dragger.positions = positions;
         this.draggers.push( dragger );
     }
+
+    // Add a dragger that will change the extruded height on the polygon.
+    if (entity.polygon.extrudedHeight) {
+      // Just be lazy and add a point at the first position.
+      var position = positions[0];
+      var carto = Cesium.Cartographic.fromCartesian( position );
+      carto.height += entity.polygon.extrudedHeight._value;
+
+      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
+
+      var dragger = this.createDragger( loc, function(dragger, position) {
+          var cartoLoc = Cesium.Cartographic.fromCartesian( position );
+          // For now just use the height of the position as the extruded height.  Use a difference later.
+          entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
+      });
+      this.draggers.push(dragger);
+    }
   }
 
   if (entity.ellipse) {
