@@ -153,6 +153,7 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
                   draggerHandler.dragger = entity;
                   this.viewer.scene.screenSpaceCameraController.enableRotate = false;
                   this.viewer.scene.screenSpaceCameraController.enableTilt = false;
+                  this.viewer.scene.screenSpaceCameraController.enableTranslate = false;
                 }
             }
         },
@@ -171,6 +172,7 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
                   draggerHandler.dragger = entity;
                   this.viewer.scene.screenSpaceCameraController.enableRotate = false;
                   this.viewer.scene.screenSpaceCameraController.enableTilt = false;
+                  this.viewer.scene.screenSpaceCameraController.enableTranslate = false;
                 }
             }
         },
@@ -236,6 +238,7 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
               draggerHandler.dragger = null;
               this.viewer.scene.screenSpaceCameraController.enableRotate = true;
               this.viewer.scene.screenSpaceCameraController.enableTilt = true;
+              this.viewer.scene.screenSpaceCameraController.enableTranslate = true;
             }
         },
         Cesium.ScreenSpaceEventType.LEFT_UP
@@ -249,6 +252,7 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
               draggerHandler.dragger = null;
               this.viewer.scene.screenSpaceCameraController.enableRotate = true;
               this.viewer.scene.screenSpaceCameraController.enableTilt = true;
+              this.viewer.scene.screenSpaceCameraController.enableTranslate = true;
             }
         },
         Cesium.ScreenSpaceEventType.LEFT_UP,
