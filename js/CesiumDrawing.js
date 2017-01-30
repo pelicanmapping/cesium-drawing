@@ -42,8 +42,11 @@ CesiumDrawing.PolylineEditor = function(editor, entity) {
   entity.polyline.positions.isConstant = false;
   for (var i = 0; i < positions.length; i++) {
       var loc = positions[i];
-      var dragger = editor.createDragger( loc, function(dragger, position) {
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
+        }
       });
       dragger.index = i;
       dragger.positions = positions;
@@ -68,7 +71,9 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
   this.draggers = [];
 
   // Create a dragger that just modifies the entities position.
-  var dragger = this.editor.createDragger(entity.position._value, function(dragger, newPosition) {
+  var dragger = this.editor.createDragger({
+    position: entity.position._value,
+    onDrag: function(dragger, newPosition) {
 
       var diff = new Cesium.Cartesian3();
       Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
@@ -77,6 +82,7 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
       var newPos = new Cesium.Cartesian3();
       Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
       dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
+    }
   });
   this.draggers.push( dragger );
 
@@ -88,10 +94,14 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
     granularity: 2.0
   }, true, false);
   var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
-  var radiusDragger = this.editor.createDragger(pos, function(dragger, newPosition) {
-    var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
-    entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
-    entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
+
+  var radiusDragger = this.editor.createDragger({
+    position: pos,
+    onDrag: function(dragger, newPosition) {
+      var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
+      entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
+      entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
+    }
   });
   dragger.radiusDragger = radiusDragger;
   this.draggers.push( radiusDragger );
@@ -118,8 +128,11 @@ CesiumDrawing.PolygonEditor = function(editor, entity) {
   entity.polygon.hierarchy.isConstant = false;
   for (var i = 0; i < positions.length; i++) {
       var loc = positions[i];
-      var dragger = editor.createDragger( loc, function(dragger, position) {
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
+        }
       });
       dragger.index = i;
       dragger.positions = positions;
@@ -152,9 +165,12 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
   entity.polygon.hierarchy.isConstant = false;
   for (i = 0; i < positions.length; i++) {
       var loc = positions[i];
-      var dragger = editor.createDragger( loc, function(dragger, position) {
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
           that.updateDraggers();
+        }
       });
       dragger.index = i;
       dragger.positions = positions;
@@ -171,11 +187,15 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
 
       var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
 
-      var dragger = this.editor.createDragger( loc, function(dragger, position) {
+      var dragger = this.editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
           var cartoLoc = Cesium.Cartographic.fromCartesian( position );
           entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
           that.updateDraggers();
-
+        },
+        vertical: true,
+        horizontal: false
       });
       dragger.index = i;
       this.heightDraggers.push(dragger);
@@ -232,8 +252,11 @@ CesiumDrawing.CorridorEditor = function(editor, entity) {
   entity.corridor.positions.isConstant = false;
   for (var i = 0; i < positions.length; i++) {
       var loc = positions[i];
-      var dragger = editor.createDragger( loc, function(dragger, position) {
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
+        }
       });
       dragger.index = i;
       dragger.positions = positions;
@@ -355,6 +378,8 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
     draggerHandler.setInputAction(
         function(movement) {
             if (draggerHandler.dragger) {
+
+              if (draggerHandler.dragger.horizontal) {
               var hit = this.viewer.camera.pickEllipsoid(movement.endPosition);
                 if (hit) {
                   draggerHandler.dragger.position = hit;
@@ -362,6 +387,31 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
                     draggerHandler.dragger.onDrag(draggerHandler.dragger, hit);
                   }
                 }
+              }
+
+              if (draggerHandler.dragger.vertical) {
+                var dy = movement.endPosition.y - movement.startPosition.y;
+                var position = draggerHandler.dragger.position._value;
+                var tangentPlane = new Cesium.EllipsoidTangentPlane( position );
+
+                scratchBoundingSphere.center = position;
+                scratchBoundingSphere.radius = 1;
+
+                var metersPerPixel = viewer.scene.frameState.camera.getPixelSize(scratchBoundingSphere,
+                                                                                 viewer.scene.frameState.context.drawingBufferWidth,
+                                                                                 viewer.scene.frameState.context.drawingBufferHeight);
+
+                var zOffset = new Cesium.Cartesian3();
+
+                Cesium.Cartesian3.multiplyByScalar(tangentPlane.zAxis, -dy * metersPerPixel, zOffset);
+                var newPosition = Cesium.Cartesian3.clone(position);
+                Cesium.Cartesian3.add(position, zOffset, newPosition);
+
+                draggerHandler.dragger.position = newPosition;
+                if (draggerHandler.dragger.onDrag) {
+                    draggerHandler.dragger.onDrag(draggerHandler.dragger, newPosition);
+                }
+              }
             }
         },
         Cesium.ScreenSpaceEventType.MOUSE_MOVE
@@ -372,7 +422,7 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
     // Mouse move drags the draggers and calls their onDrag callback.
     draggerHandler.setInputAction(
         function(movement) {
-            if (draggerHandler.dragger) {
+            if (draggerHandler.dragger && draggerHandler.dragger.verticalCtrl) {
                 var dy = movement.endPosition.y - movement.startPosition.y;
                 var position = draggerHandler.dragger.position._value;
                 var tangentPlane = new Cesium.EllipsoidTangentPlane( position );
@@ -436,15 +486,24 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
 /**
  * Creates a Dragger
  */
-CesiumDrawing.Editor.prototype.createDragger = function(position, onDrag) {
+CesiumDrawing.Editor.prototype.createDragger = function(options) {
+
+   var position = Cesium.defaultValue(options.position, Cesium.Cartesian3.ZERO);
+   var onDrag = Cesium.defaultValue(options.onDrag, null);
+   var icon = Cesium.defaultValue(options.icon, "img/dragIcon.png");
+
    var dragger = this.viewer.entities.add({
       position : position,
       billboard :{
-          image : "img/dragIcon.png"
+          image : icon
       }
   });
   dragger._isDragger = true;
   dragger.onDrag = onDrag;
+  dragger.horizontal = Cesium.defaultValue(options.horizontal, true);
+  dragger.vertical = Cesium.defaultValue(options.vertical, false);
+  dragger.verticalCtrl = Cesium.defaultValue(options.vertical, false);
+
   return dragger;
 };
 
