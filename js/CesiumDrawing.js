@@ -142,6 +142,9 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
   this.editor = editor;
   this.entity = entity;
   this.draggers = [];
+  this.heightDraggers = [];
+
+  var that = this;
 
   var i = 0;
 
@@ -151,6 +154,7 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
       var loc = positions[i];
       var dragger = editor.createDragger( loc, function(dragger, position) {
           dragger.positions[dragger.index] = position;
+          that.updateDraggers();
       });
       dragger.index = i;
       dragger.positions = positions;
@@ -169,19 +173,49 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
 
       var dragger = this.editor.createDragger( loc, function(dragger, position) {
           var cartoLoc = Cesium.Cartographic.fromCartesian( position );
-          // For now just use the height of the position as the extruded height.  Use a difference later.
           entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
+          that.updateDraggers();
+
       });
-      this.draggers.push(dragger);
+      dragger.index = i;
+      this.heightDraggers.push(dragger);
     }
   }
 };
 
+CesiumDrawing.ExtrudedPolygonEditor.prototype.updateDraggers = function() {
+  var positions = this.entity.polygon.hierarchy._value;
+
+  var height = this.entity.polygon.extrudedHeight._value;
+
+  for (var i = 0; i < this.heightDraggers.length; i++) {
+      var position = positions[i];
+      var dragger = this.heightDraggers[i];
+
+      var carto = Cesium.Cartographic.fromCartesian( position );
+      carto.height += height;
+
+      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
+
+      dragger.position = loc;
+    }
+
+};
+
+
+
 CesiumDrawing.ExtrudedPolygonEditor.prototype.destroy = function() {
-  for (var i = 0; i < this.draggers.length; i++) {
+  var i = 0;
+
+  for (i = 0; i < this.draggers.length; i++) {
     this.editor.viewer.entities.remove( this.draggers[i]);
   }
   this.draggers = [];
+
+  for (i = 0; i < this.heightDraggers.length; i++) {
+    this.editor.viewer.entities.remove( this.heightDraggers[i]);
+  }
+  this.heightDraggers = [];
 };
 
 
