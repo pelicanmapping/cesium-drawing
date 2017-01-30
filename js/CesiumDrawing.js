@@ -8,7 +8,7 @@ CesiumDrawing.extendEntity = function(entity) {
     entity.stopEdit = new Cesium.Event();
 
     entity.startEditing = function() {
-    entity.startEdit.raiseEvent(entity);
+      entity.startEdit.raiseEvent(entity);
     };
 
     entity.stopEditing = function() {
@@ -29,104 +29,224 @@ CesiumDrawing.Editor = function(viewer) {
     this.initializeDraggerHandler();
 };
 
+
+/**
+ * An editor that allows you to edit a polyline.
+ */
+CesiumDrawing.PolylineEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.polyline.positions._value;
+  entity.polyline.positions.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger( loc, function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+};
+
+CesiumDrawing.PolylineEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+/**
+ * An editor that allows you to edit an ellipse
+ */
+CesiumDrawing.EllipseEditor = function(editor, entity) {
+
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  // Create a dragger that just modifies the entities position.
+  var dragger = this.editor.createDragger(entity.position._value, function(dragger, newPosition) {
+
+      var diff = new Cesium.Cartesian3();
+      Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
+      entity.position._value = newPosition;
+
+      var newPos = new Cesium.Cartesian3();
+      Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
+      dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
+  });
+  this.draggers.push( dragger );
+
+  var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
+    center: entity.position._value,
+    semiMinorAxis: entity.ellipse.semiMinorAxis._value,
+    semiMajorAxis: entity.ellipse.semiMajorAxis._value,
+    rotation: 0.0,
+    granularity: 2.0
+  }, true, false);
+  var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
+  var radiusDragger = this.editor.createDragger(pos, function(dragger, newPosition) {
+    var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
+    entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
+    entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
+  });
+  dragger.radiusDragger = radiusDragger;
+  this.draggers.push( radiusDragger );
+};
+
+
+CesiumDrawing.EllipseEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+/**
+ * Polygon editor.
+ */
+CesiumDrawing.PolygonEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.polygon.hierarchy._value;
+  entity.polygon.hierarchy.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger( loc, function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+};
+
+CesiumDrawing.PolygonEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+/**
+ * ExtrudedPolygon editor.
+ */
+CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.polygon.hierarchy._value;
+  entity.polygon.hierarchy.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger( loc, function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+
+  // Add a dragger that will change the extruded height on the polygon.
+  if (entity.polygon.extrudedHeight) {
+    // Just be lazy and add a point at the first position.
+    var position = positions[0];
+    var carto = Cesium.Cartographic.fromCartesian( position );
+    carto.height += entity.polygon.extrudedHeight._value;
+
+    var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
+
+    var dragger = this.editor.createDragger( loc, function(dragger, position) {
+        var cartoLoc = Cesium.Cartographic.fromCartesian( position );
+        // For now just use the height of the position as the extruded height.  Use a difference later.
+        entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
+    });
+    this.draggers.push(dragger);
+  }
+};
+
+CesiumDrawing.ExtrudedPolygonEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+
+/**
+ * Cooridor editor
+ */
+CesiumDrawing.CorridorEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.corridor.positions._value;
+  entity.corridor.positions.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger( loc, function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+};
+
+CesiumDrawing.CorridorEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+
 CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
 
   entity.startEditing();
 
   if (entity.polyline) {
-    var positions = entity.polyline.positions._value;
-    entity.polyline.positions.isConstant = false;
-    for (var i = 0; i < positions.length; i++) {
-        var loc = positions[i];
-        var dragger = this.createDragger( loc, function(dragger, position) {
-            dragger.positions[dragger.index] = position;
-        });
-        dragger.index = i;
-        dragger.positions = positions;
-        this.draggers.push( dragger );
-    }
+    entity.editor = new CesiumDrawing.PolylineEditor(this, entity);
   }
 
   if (entity.polygon) {
-    var positions = entity.polygon.hierarchy._value;
-    entity.polygon.hierarchy.isConstant = false;
-    for (var i = 0; i < positions.length; i++) {
-        var loc = positions[i];
-        var dragger = this.createDragger( loc, function(dragger, position) {
-            dragger.positions[dragger.index] = position;
-        });
-        dragger.index = i;
-        dragger.positions = positions;
-        this.draggers.push( dragger );
+    if (entity.polygon.extrudedHeight)
+    {
+      entity.editor = new CesiumDrawing.ExtrudedPolygonEditor(this, entity);
     }
-
-    // Add a dragger that will change the extruded height on the polygon.
-    if (entity.polygon.extrudedHeight) {
-      // Just be lazy and add a point at the first position.
-      var position = positions[0];
-      var carto = Cesium.Cartographic.fromCartesian( position );
-      carto.height += entity.polygon.extrudedHeight._value;
-
-      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
-
-      var dragger = this.createDragger( loc, function(dragger, position) {
-          var cartoLoc = Cesium.Cartographic.fromCartesian( position );
-          // For now just use the height of the position as the extruded height.  Use a difference later.
-          entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
-      });
-      this.draggers.push(dragger);
+    else
+    {
+      entity.editor = new CesiumDrawing.PolygonEditor(this, entity);
     }
   }
 
   if (entity.ellipse) {
-    // Create a dragger that just modifies the entities position.
-    var dragger = this.createDragger(entity.position._value, function(dragger, newPosition) {
-
-        var diff = new Cesium.Cartesian3();
-        Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
-        entity.position._value = newPosition;
-
-
-        var newPos = new Cesium.Cartesian3();
-        Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
-        dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
-    });
-    this.draggers.push( dragger );
-
-    var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
-      center: entity.position._value,
-      semiMinorAxis: entity.ellipse.semiMinorAxis._value,
-      semiMajorAxis: entity.ellipse.semiMajorAxis._value,
-      rotation: 0.0,
-      granularity: 2.0
-    }, true, false);
-    var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
-    var radiusDragger = this.createDragger(pos, function(dragger, newPosition) {
-      var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
-      entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
-      entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
-    });
-    dragger.radiusDragger = radiusDragger;
-    this.draggers.push( radiusDragger );
+    entity.editor = new CesiumDrawing.EllipseEditor(this, entity);
   }
 
   if (entity.corridor) {
-    var positions = entity.corridor.positions._value;
-    entity.corridor.positions.isConstant = false;
-    for (var i = 0; i < positions.length; i++) {
-        var loc = positions[i];
-        var dragger = this.createDragger( loc, function(dragger, position) {
-            dragger.positions[dragger.index] = position;
-        });
-        dragger.index = i;
-        dragger.positions = positions;
-        this.draggers.push( dragger );
-    }
+    entity.editor = new CesiumDrawing.CorridorEditor(this, entity);
   }
 };
 
 CesiumDrawing.Editor.prototype.stopEditing = function( entity ) {
     entity.stopEditing();
+
+    if (entity.editor) {
+      entity.editor.destroy();
+      entity.editor = null;
+    }
 
     // Mark the position properties as being constant since we are done editing.
     // You will see a flash as the geometry rebuilds, but rendering performance of the static geometries will
@@ -137,13 +257,9 @@ CesiumDrawing.Editor.prototype.stopEditing = function( entity ) {
     else if (entity.polygon) {
       entity.polygon.hierarchy.isConstant = true;
     }
-
-    // Get rid of all the draggers.
-    for (var i = 0; i < this.draggers.length; i++) {
-      this.viewer.entities.remove( this.draggers[i]);
+    else if (entity.corridor) {
+      entity.corridor.positions.isConstant = true;
     }
-
-    this.draggers = [];
 };
 
 
