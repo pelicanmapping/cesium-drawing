@@ -20,258 +20,9 @@ CesiumDrawing.extendEntity = function(entity) {
  * Create a new editor that manages overall drawing and editing capabilities for a Viewer.
  */
 CesiumDrawing.Editor = function(viewer) {
-
     this.viewer = viewer;
-
-    // TODO:  Make this per entity editor.
-    this.draggers = [];
-
     this.initializeDraggerHandler();
 };
-
-
-/**
- * An editor that allows you to edit a polyline.
- */
-CesiumDrawing.PolylineEditor = function(editor, entity) {
-  this.editor = editor;
-  this.entity = entity;
-  this.draggers = [];
-
-  var positions = entity.polyline.positions._value;
-  entity.polyline.positions.isConstant = false;
-  for (var i = 0; i < positions.length; i++) {
-      var loc = positions[i];
-      var dragger = editor.createDragger({
-        position: loc,
-        onDrag: function(dragger, position) {
-          dragger.positions[dragger.index] = position;
-        }
-      });
-      dragger.index = i;
-      dragger.positions = positions;
-      this.draggers.push( dragger );
-  }
-};
-
-CesiumDrawing.PolylineEditor.prototype.destroy = function() {
-  for (var i = 0; i < this.draggers.length; i++) {
-    this.editor.viewer.entities.remove( this.draggers[i]);
-  }
-  this.draggers = [];
-};
-
-/**
- * An editor that allows you to edit an ellipse
- */
-CesiumDrawing.EllipseEditor = function(editor, entity) {
-
-  this.editor = editor;
-  this.entity = entity;
-  this.draggers = [];
-
-  // Create a dragger that just modifies the entities position.
-  var dragger = this.editor.createDragger({
-    position: entity.position._value,
-    onDrag: function(dragger, newPosition) {
-
-      var diff = new Cesium.Cartesian3();
-      Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
-      entity.position._value = newPosition;
-
-      var newPos = new Cesium.Cartesian3();
-      Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
-      dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
-    }
-  });
-  this.draggers.push( dragger );
-
-  var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
-    center: entity.position._value,
-    semiMinorAxis: entity.ellipse.semiMinorAxis._value,
-    semiMajorAxis: entity.ellipse.semiMajorAxis._value,
-    rotation: 0.0,
-    granularity: 2.0
-  }, true, false);
-  var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
-
-  var radiusDragger = this.editor.createDragger({
-    position: pos,
-    onDrag: function(dragger, newPosition) {
-      var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
-      entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
-      entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
-    }
-  });
-  dragger.radiusDragger = radiusDragger;
-  this.draggers.push( radiusDragger );
-};
-
-
-CesiumDrawing.EllipseEditor.prototype.destroy = function() {
-  for (var i = 0; i < this.draggers.length; i++) {
-    this.editor.viewer.entities.remove( this.draggers[i]);
-  }
-  this.draggers = [];
-};
-
-
-/**
- * Polygon editor.
- */
-CesiumDrawing.PolygonEditor = function(editor, entity) {
-  this.editor = editor;
-  this.entity = entity;
-  this.draggers = [];
-
-  var positions = entity.polygon.hierarchy._value;
-  entity.polygon.hierarchy.isConstant = false;
-  for (var i = 0; i < positions.length; i++) {
-      var loc = positions[i];
-      var dragger = editor.createDragger({
-        position: loc,
-        onDrag: function(dragger, position) {
-          dragger.positions[dragger.index] = position;
-        }
-      });
-      dragger.index = i;
-      dragger.positions = positions;
-      this.draggers.push( dragger );
-  }
-};
-
-CesiumDrawing.PolygonEditor.prototype.destroy = function() {
-  for (var i = 0; i < this.draggers.length; i++) {
-    this.editor.viewer.entities.remove( this.draggers[i]);
-  }
-  this.draggers = [];
-};
-
-
-/**
- * ExtrudedPolygon editor.
- */
-CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
-  this.editor = editor;
-  this.entity = entity;
-  this.draggers = [];
-  this.heightDraggers = [];
-
-  var that = this;
-
-  var i = 0;
-
-  var positions = entity.polygon.hierarchy._value;
-  entity.polygon.hierarchy.isConstant = false;
-  for (i = 0; i < positions.length; i++) {
-      var loc = positions[i];
-      var dragger = editor.createDragger({
-        position: loc,
-        onDrag: function(dragger, position) {
-          dragger.positions[dragger.index] = position;
-          that.updateDraggers();
-        }
-      });
-      dragger.index = i;
-      dragger.positions = positions;
-      this.draggers.push( dragger );
-  }
-
-  // Add a dragger that will change the extruded height on the polygon.
-  if (entity.polygon.extrudedHeight) {
-
-    for (i = 0; i < positions.length; i++) {
-      var position = positions[i];
-      var carto = Cesium.Cartographic.fromCartesian( position );
-      carto.height += entity.polygon.extrudedHeight._value;
-
-      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
-
-      var dragger = this.editor.createDragger({
-        position: loc,
-        onDrag: function(dragger, position) {
-          var cartoLoc = Cesium.Cartographic.fromCartesian( position );
-          entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
-          that.updateDraggers();
-        },
-        vertical: true,
-        horizontal: false
-      });
-      dragger.index = i;
-      this.heightDraggers.push(dragger);
-    }
-  }
-};
-
-CesiumDrawing.ExtrudedPolygonEditor.prototype.updateDraggers = function() {
-  var positions = this.entity.polygon.hierarchy._value;
-
-  var height = this.entity.polygon.extrudedHeight._value;
-
-  for (var i = 0; i < this.heightDraggers.length; i++) {
-      var position = positions[i];
-      var dragger = this.heightDraggers[i];
-
-      var carto = Cesium.Cartographic.fromCartesian( position );
-      carto.height += height;
-
-      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
-
-      dragger.position = loc;
-    }
-
-};
-
-
-
-CesiumDrawing.ExtrudedPolygonEditor.prototype.destroy = function() {
-  var i = 0;
-
-  for (i = 0; i < this.draggers.length; i++) {
-    this.editor.viewer.entities.remove( this.draggers[i]);
-  }
-  this.draggers = [];
-
-  for (i = 0; i < this.heightDraggers.length; i++) {
-    this.editor.viewer.entities.remove( this.heightDraggers[i]);
-  }
-  this.heightDraggers = [];
-};
-
-
-
-/**
- * Cooridor editor
- */
-CesiumDrawing.CorridorEditor = function(editor, entity) {
-  this.editor = editor;
-  this.entity = entity;
-  this.draggers = [];
-
-  var positions = entity.corridor.positions._value;
-  entity.corridor.positions.isConstant = false;
-  for (var i = 0; i < positions.length; i++) {
-      var loc = positions[i];
-      var dragger = editor.createDragger({
-        position: loc,
-        onDrag: function(dragger, position) {
-          dragger.positions[dragger.index] = position;
-        }
-      });
-      dragger.index = i;
-      dragger.positions = positions;
-      this.draggers.push( dragger );
-  }
-};
-
-CesiumDrawing.CorridorEditor.prototype.destroy = function() {
-  for (var i = 0; i < this.draggers.length; i++) {
-    this.editor.viewer.entities.remove( this.draggers[i]);
-  }
-  this.draggers = [];
-};
-
-
 
 CesiumDrawing.Editor.prototype.startEditing = function( entity ) {
 
@@ -550,3 +301,249 @@ CesiumDrawing.Editor.prototype.createPositionsHandler = function(entity, positio
 
   return handler;
 };
+
+
+
+/**
+ * An editor that allows you to edit a polyline.
+ */
+CesiumDrawing.PolylineEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.polyline.positions._value;
+  entity.polyline.positions.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+        }
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+};
+
+CesiumDrawing.PolylineEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+/**
+ * An editor that allows you to edit an ellipse
+ */
+CesiumDrawing.EllipseEditor = function(editor, entity) {
+
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  // Create a dragger that just modifies the entities position.
+  var dragger = this.editor.createDragger({
+    position: entity.position._value,
+    onDrag: function(dragger, newPosition) {
+
+      var diff = new Cesium.Cartesian3();
+      Cesium.Cartesian3.subtract(newPosition, entity.position._value, diff);
+      entity.position._value = newPosition;
+
+      var newPos = new Cesium.Cartesian3();
+      Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
+      dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
+    }
+  });
+  this.draggers.push( dragger );
+
+  var cep = Cesium.EllipseGeometryLibrary.computeEllipsePositions({
+    center: entity.position._value,
+    semiMinorAxis: entity.ellipse.semiMinorAxis._value,
+    semiMajorAxis: entity.ellipse.semiMajorAxis._value,
+    rotation: 0.0,
+    granularity: 2.0
+  }, true, false);
+  var pos = new Cesium.Cartesian3(cep.positions[0], cep.positions[1], cep.positions[2]);
+
+  var radiusDragger = this.editor.createDragger({
+    position: pos,
+    onDrag: function(dragger, newPosition) {
+      var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
+      entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
+      entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
+    }
+  });
+  dragger.radiusDragger = radiusDragger;
+  this.draggers.push( radiusDragger );
+};
+
+
+CesiumDrawing.EllipseEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+/**
+ * Polygon editor.
+ */
+CesiumDrawing.PolygonEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.polygon.hierarchy._value;
+  entity.polygon.hierarchy.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+        }
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+};
+
+CesiumDrawing.PolygonEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+/**
+ * ExtrudedPolygon editor.
+ */
+CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+  this.heightDraggers = [];
+
+  var that = this;
+
+  var i = 0;
+
+  var positions = entity.polygon.hierarchy._value;
+  entity.polygon.hierarchy.isConstant = false;
+  for (i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+          that.updateDraggers();
+        }
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+
+  // Add a dragger that will change the extruded height on the polygon.
+  if (entity.polygon.extrudedHeight) {
+
+    for (i = 0; i < positions.length; i++) {
+      var position = positions[i];
+      var carto = Cesium.Cartographic.fromCartesian( position );
+      carto.height += entity.polygon.extrudedHeight._value;
+
+      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
+
+      var dragger = this.editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
+          var cartoLoc = Cesium.Cartographic.fromCartesian( position );
+          entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
+          that.updateDraggers();
+        },
+        vertical: true,
+        horizontal: false
+      });
+      dragger.index = i;
+      this.heightDraggers.push(dragger);
+    }
+  }
+};
+
+CesiumDrawing.ExtrudedPolygonEditor.prototype.updateDraggers = function() {
+  var positions = this.entity.polygon.hierarchy._value;
+
+  var height = this.entity.polygon.extrudedHeight._value;
+
+  for (var i = 0; i < this.heightDraggers.length; i++) {
+      var position = positions[i];
+      var dragger = this.heightDraggers[i];
+
+      var carto = Cesium.Cartographic.fromCartesian( position );
+      carto.height += height;
+
+      var loc = Cesium.Cartesian3.fromRadians( carto.longitude, carto.latitude, carto.height);
+
+      dragger.position = loc;
+    }
+
+};
+
+
+
+CesiumDrawing.ExtrudedPolygonEditor.prototype.destroy = function() {
+  var i = 0;
+
+  for (i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+
+  for (i = 0; i < this.heightDraggers.length; i++) {
+    this.editor.viewer.entities.remove( this.heightDraggers[i]);
+  }
+  this.heightDraggers = [];
+};
+
+
+
+/**
+ * Cooridor editor
+ */
+CesiumDrawing.CorridorEditor = function(editor, entity) {
+  this.editor = editor;
+  this.entity = entity;
+  this.draggers = [];
+
+  var positions = entity.corridor.positions._value;
+  entity.corridor.positions.isConstant = false;
+  for (var i = 0; i < positions.length; i++) {
+      var loc = positions[i];
+      var dragger = editor.createDragger({
+        position: loc,
+        onDrag: function(dragger, position) {
+          dragger.positions[dragger.index] = position;
+        }
+      });
+      dragger.index = i;
+      dragger.positions = positions;
+      this.draggers.push( dragger );
+  }
+};
+
+CesiumDrawing.CorridorEditor.prototype.destroy = function() {
+  for (var i = 0; i < this.draggers.length; i++) {
+    this.editor.viewer.entities.remove( this.draggers[i]);
+  }
+  this.draggers = [];
+};
+
+
+
