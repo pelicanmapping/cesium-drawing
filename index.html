@@ -43,6 +43,19 @@
         background: #eee;
       }
 
+      #properties {
+        position: absolute;
+        bottom: 150px;
+        left: 10px;
+        background-color: #000000;
+        color: #ffffff;
+      }
+
+      #geojson {
+        height: 400px;
+        width: 300px;
+      }
+
 
   </style>
 
@@ -72,6 +85,13 @@
       </div>
     </div>
 
+    <div id="properties">
+      <div>Selected Feature</div>
+      <div>GeoJSON</div>
+      <textarea id="geojson" readonly>
+      </textarea>
+    </div>
+
     <script>
 
     var viewer = new Cesium.Viewer('cesiumContainer', {
@@ -85,6 +105,44 @@
     var editor = new CesiumDrawing.Editor( viewer );
 
 
+    /**
+     * Convert an array of positions to GeoJSON
+     */
+    function positionsToGeoJSON( positions, type ) {
+
+      var coordinates = [];
+
+      for (var i = 0; i < positions.length; i++) {
+        var carto = Cesium.Cartographic.fromCartesian( positions[i] );
+        coordinates.push( [Cesium.Math.toDegrees( carto.longitude ), Cesium.Math.toDegrees( carto.latitude), carto.height]);
+      }
+
+      if (type === "Polygon") {
+        // Make sure the first and the last coordinates are the same.
+        var first = coordinates[0];
+        var last = coordinates[coordinates.length-1];
+        if (first[0] != last[0] || first[1] != last[1] || first[2] != last[2]) {
+          coordinates.push(first);
+        }
+        coordinates = [coordinates];
+      }
+
+      return {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: type,
+              coordinates: coordinates
+            }
+          }
+        ]
+      }
+    }
+
+
     function startEdit(entity) {
         // Editing mode is starting, so change the style.
         if (entity.polyline) {
@@ -96,6 +154,8 @@
         if (entity.corridor) {
           entity.corridor.material = Cesium.Color.YELLOW;
         }
+
+        updateGeoJSON( entity );
     }
 
     function stopEdit(entity) {
@@ -109,6 +169,17 @@
         if (entity.corridor) {
           entity.corridor.material = Cesium.Color.RED;
         }
+
+        updateGeoJSON( entity );
+    }
+
+    function updateGeoJSON(entity) {
+      if (entity.polyline) {
+        $("#geojson").val( JSON.stringify( positionsToGeoJSON( entity.polyline.positions._value, "LineString")));
+      }
+      else if (entity.polygon){
+        $("#geojson").val( JSON.stringify( positionsToGeoJSON( entity.polygon.hierarchy._value, "Polygon" )));
+      }
     }
 
 
