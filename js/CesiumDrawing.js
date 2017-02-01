@@ -6,6 +6,7 @@ CesiumDrawing = {};
 CesiumDrawing.extendEntity = function(entity) {
     entity.startEdit = new Cesium.Event();
     entity.stopEdit = new Cesium.Event();
+    entity.edited = new Cesium.Event();
 
     entity.startEditing = function() {
       entity.startEdit.raiseEvent(entity);
@@ -14,6 +15,10 @@ CesiumDrawing.extendEntity = function(entity) {
     entity.stopEditing = function() {
       entity.stopEdit.raiseEvent(entity);
     };
+
+    entity.onEdit = function() {
+      entity.edited.raiseEvent(entity);
+    }
 };
 
 /**
@@ -276,6 +281,8 @@ CesiumDrawing.Editor.prototype.createPositionsHandler = function(entity, positio
         var index = positions.length;
         positions.push( cartesian );
         handler.lastPointTemporary = false;
+
+        entity.onEdit();
       }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -297,6 +304,7 @@ CesiumDrawing.Editor.prototype.createPositionsHandler = function(entity, positio
   handler.setInputAction(function(movement) {
       entity.inProgress = false;
       handler.destroy();
+      entity.onEdit();
   }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
   return handler;
@@ -320,6 +328,7 @@ CesiumDrawing.PolylineEditor = function(editor, entity) {
         position: loc,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
+          entity.onEdit();
         }
       });
       dragger.index = i;
@@ -356,6 +365,8 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
       var newPos = new Cesium.Cartesian3();
       Cesium.Cartesian3.add(dragger.radiusDragger.position._value, diff, newPos)
       dragger.radiusDragger.position = new Cesium.ConstantProperty(newPos);
+
+      entity.onEdit();
     }
   });
   this.draggers.push( dragger );
@@ -375,6 +386,7 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
       var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
       entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
       entity.ellipse.semiMajorAxis = new Cesium.ConstantProperty( radius );
+      entity.onEdit();
     }
   });
   dragger.radiusDragger = radiusDragger;
@@ -406,6 +418,7 @@ CesiumDrawing.PolygonEditor = function(editor, entity) {
         position: loc,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
+          entity.onEdit();
         }
       });
       dragger.index = i;
@@ -444,6 +457,7 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
           that.updateDraggers();
+          entity.onEdit();
         }
       });
       dragger.index = i;
@@ -467,6 +481,7 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
           var cartoLoc = Cesium.Cartographic.fromCartesian( position );
           entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
           that.updateDraggers();
+          entity.onEdit();
         },
         vertical: true,
         horizontal: false
@@ -530,6 +545,7 @@ CesiumDrawing.CorridorEditor = function(editor, entity) {
         position: loc,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
+          entity.onEdit();
         }
       });
       dragger.index = i;

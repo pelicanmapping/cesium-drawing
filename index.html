@@ -173,6 +173,10 @@
         updateGeoJSON( entity );
     }
 
+    function onEdit(entity) {
+      updateGeoJSON( entity );
+    }
+
     function updateGeoJSON(entity) {
       if (entity.polyline) {
         $("#geojson").val( JSON.stringify( positionsToGeoJSON( entity.polyline.positions._value, "LineString")));
@@ -181,7 +185,6 @@
         $("#geojson").val( JSON.stringify( positionsToGeoJSON( entity.polygon.hierarchy._value, "Polygon" )));
       }
     }
-
 
     function drawPolyline() {
 
@@ -201,6 +204,7 @@
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
+      entity.edited.addEventListener(onEdit);
     }
 
     function drawPolygon() {
@@ -219,6 +223,7 @@
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
+      entity.edited.addEventListener(onEdit);
     }
 
     function drawCorridor() {
@@ -243,6 +248,7 @@
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
+      entity.edited.addEventListener(onEdit);
     }
 
     function drawCorridor2() {
@@ -268,6 +274,7 @@
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
+      entity.edited.addEventListener(onEdit);
     }
 
 
@@ -290,6 +297,7 @@
 
       entity.startEdit.addEventListener(startEdit);
       entity.stopEdit.addEventListener(stopEdit);
+      entity.edited.addEventListener(onEdit);
     }
 
     function drawCircle() {
