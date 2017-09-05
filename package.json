@@ -30,7 +30,8 @@
     "requirejs": "2.1.20",
     "rimraf": "^2.4.3",
     "strip-comments": "^0.3.2",
-    "yargs": "3.27.0"
+    "yargs": "3.27.0",
+    "cesium": "1.37.0"
   },
   "scripts": {
     "start": "node server.js"
