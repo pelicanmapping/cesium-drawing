@@ -136,7 +136,8 @@ CesiumDrawing.Editor.prototype.initializeDraggerHandler = function() {
             if (draggerHandler.dragger) {
 
               if (draggerHandler.dragger.horizontal) {
-              var hit = this.viewer.camera.pickEllipsoid(movement.endPosition);
+                var ray = viewer.camera.getPickRay(movement.endPosition);
+                var hit = viewer.scene.globe.pick(ray, viewer.scene);
                 if (hit) {
                   draggerHandler.dragger.position = hit;
                   if (draggerHandler.dragger.onDrag) {
@@ -272,7 +273,9 @@ CesiumDrawing.Editor.prototype.createPositionsHandler = function(entity, positio
   // Adds a point to the positions list.
   handler.lastPointTemporary = false;
   handler.setInputAction(function(movement) {
-      var cartesian = viewer.camera.pickEllipsoid(movement.position, this.viewer.scene.globe.ellipsoid);
+      var ray = viewer.camera.getPickRay(movement.position);
+      var cartesian = viewer.scene.globe.pick(ray, viewer.scene);
+
       if (cartesian) {
         if (handler.lastPointTemporary)
         {
@@ -289,7 +292,8 @@ CesiumDrawing.Editor.prototype.createPositionsHandler = function(entity, positio
   // Replaces the last point in the list with the point under the mouse.
   handler.setInputAction(function(movement) {
     if (movement.endPosition) {
-        var cartesian = this.viewer.camera.pickEllipsoid(movement.endPosition, this.viewer.scene.globe.ellipsoid);
+        var ray = viewer.camera.getPickRay(movement.endPosition);
+        var cartesian = viewer.scene.globe.pick(ray, viewer.scene);
         if (cartesian) {
           if (handler.lastPointTemporary)
           {
@@ -335,6 +339,7 @@ CesiumDrawing.PolylineEditor = function(editor, entity) {
       dragger.positions = positions;
       this.draggers.push( dragger );
   }
+
 };
 
 CesiumDrawing.PolylineEditor.prototype.destroy = function() {
