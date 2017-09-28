@@ -195,7 +195,7 @@
           polyline : {
               positions: new DynamicProperty([]),
               width : 2,
-              material : Cesium.Color.RED
+              material : Cesium.Color.RED              
           }
       });
       CesiumDrawing.extendEntity(entity);
@@ -215,7 +215,8 @@
           name : 'Entity ' + viewer.entities.values.length,
           polygon : {
             hierarchy: new DynamicProperty([]),
-            material : Cesium.Color.RED
+            material : Cesium.Color.RED,
+            perPositionHeight: true
           }
       });
       CesiumDrawing.extendEntity( entity );

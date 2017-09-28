@@ -248,11 +248,13 @@ CesiumDrawing.Editor.prototype.createDragger = function(options) {
    var position = Cesium.defaultValue(options.position, Cesium.Cartesian3.ZERO);
    var onDrag = Cesium.defaultValue(options.onDrag, null);
    var icon = Cesium.defaultValue(options.icon, "img/dragIcon.png");
+   var heightReference = Cesium.defaultValue(options.heightReference, Cesium.HeightReference.NONE);
 
    var dragger = this.viewer.entities.add({
       position : position,
       billboard :{
-          image : icon
+          image : icon,
+          heightReference : heightReference
       }
   });
   dragger._isDragger = true;
@@ -330,6 +332,7 @@ CesiumDrawing.PolylineEditor = function(editor, entity) {
       var loc = positions[i];
       var dragger = editor.createDragger({
         position: loc,
+        heightReference: Cesium.HeightReference.NONE,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
           entity.onEdit();
@@ -361,6 +364,7 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
   // Create a dragger that just modifies the entities position.
   var dragger = this.editor.createDragger({
     position: entity.position._value,
+    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
     onDrag: function(dragger, newPosition) {
 
       var diff = new Cesium.Cartesian3();
@@ -387,6 +391,7 @@ CesiumDrawing.EllipseEditor = function(editor, entity) {
 
   var radiusDragger = this.editor.createDragger({
     position: pos,
+    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
     onDrag: function(dragger, newPosition) {
       var radius = Cesium.Cartesian3.distance(entity.position._value, newPosition);
       entity.ellipse.semiMinorAxis = new Cesium.ConstantProperty( radius );
@@ -415,12 +420,19 @@ CesiumDrawing.PolygonEditor = function(editor, entity) {
   this.entity = entity;
   this.draggers = [];
 
+  var heightReference = Cesium.HeightReference.NONE;
+  // If the polygon uses per position height clamp the draggers to the ground.
+  if (entity.polygon.perPositionHeight) {
+    heightReference = Cesium.HeightReference.CLAMP_TO_GROUND;
+  }
+
   var positions = entity.polygon.hierarchy._value;
   entity.polygon.hierarchy.isConstant = false;
   for (var i = 0; i < positions.length; i++) {
       var loc = positions[i];
       var dragger = editor.createDragger({
         position: loc,
+        heightReference: heightReference,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
           entity.onEdit();
@@ -459,6 +471,7 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
       var loc = positions[i];
       var dragger = editor.createDragger({
         position: loc,
+        heightReference: Cesium.HeightReference.NONE,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
           that.updateDraggers();
@@ -482,6 +495,7 @@ CesiumDrawing.ExtrudedPolygonEditor = function(editor, entity) {
 
       var dragger = this.editor.createDragger({
         position: loc,
+        heightReference: Cesium.HeightReference.NONE,
         onDrag: function(dragger, position) {
           var cartoLoc = Cesium.Cartographic.fromCartesian( position );
           entity.polygon.extrudedHeight = new Cesium.ConstantProperty(cartoLoc.height);
@@ -548,6 +562,7 @@ CesiumDrawing.CorridorEditor = function(editor, entity) {
       var loc = positions[i];
       var dragger = editor.createDragger({
         position: loc,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         onDrag: function(dragger, position) {
           dragger.positions[dragger.index] = position;
           entity.onEdit();
