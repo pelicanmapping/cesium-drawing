@@ -10,8 +10,7 @@
   <title>Cesium Drawing</title>
 
   <script src="js/jquery-3.1.1.min.js"></script>
-  <!--<script src="Cesium/Cesium/Cesium.js"></script>-->
-  <script src="node_modules/cesium/Build/Cesium/Cesium.js"></script>
+  <script src="Cesium/Cesium.js"></script>
   <script src="js/DynamicProperty.js"></script>
   <script src="js/CesiumDrawing.js"></script>
 
@@ -195,7 +194,7 @@
           polyline : {
               positions: new DynamicProperty([]),
               width : 2,
-              material : Cesium.Color.RED              
+              material : Cesium.Color.RED
           }
       });
       CesiumDrawing.extendEntity(entity);
